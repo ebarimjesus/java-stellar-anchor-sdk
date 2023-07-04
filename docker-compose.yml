@@ -1,0 +1,47 @@
+version: "3.8"
+
+services:
+  sep-server:
+    image: stellar/anchor-platform:2.1.1
+    command: --sep-server
+    env_file:
+      - ./dev.env
+    volumes:
+      - ./config:/home
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+  platform-server:
+    image: stellar/anchor-platform:2.1.1
+    command: --platform-server
+    env_file:
+      - ./dev.env
+    volumes:
+      - ./config:/home
+    ports:
+      - "8085:8085"
+    depends_on:
+      - db
+  observer:
+    image: stellar/anchor-platform:2.1.1
+    command: --stellar-observer
+    env_file:
+      - ./dev.env
+    volumes:
+      - ./config:/home
+
+  server:
+    build: .
+    ports:
+      - "8081:8081"
+    env_file:
+      - ./dev.env
+  db:
+    image: postgres:14
+    ports:
+      - "5432:5432"
+    env_file:
+      - ./dev.env
+
+
