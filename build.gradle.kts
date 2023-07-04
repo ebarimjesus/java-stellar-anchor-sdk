@@ -1,3 +1,5 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+
 // The alias call in plugins scope produces IntelliJ false error which is suppressed here.
 @Suppress("DSL_SCOPE_VIOLATION")
 plugins {
@@ -10,8 +12,11 @@ tasks {
   register<Copy>("updateGitHook") {
     from("scripts/pre-commit.sh") { rename { it.removeSuffix(".sh") } }
     into(".git/hooks")
-
-    doLast { project.exec { commandLine("chmod", "+x", ".git/hooks/pre-commit") } }
+    doLast {
+      if (!Os.isFamily(Os.FAMILY_WINDOWS)) {
+        project.exec { commandLine("chmod", "+x", ".git/hooks/pre-commit") }
+      }
+    }
   }
 
   "build" { dependsOn("updateGitHook") }
@@ -56,7 +61,7 @@ subprojects {
       googleJavaFormat()
     }
 
-    kotlin { ktfmt("0.41").googleStyle() }
+    kotlin { ktfmt("0.42").googleStyle() }
   }
 
   dependencies {
@@ -72,7 +77,6 @@ subprojects {
     implementation(rootProject.libs.bundles.kafka)
     implementation(rootProject.libs.spring.kafka)
     implementation(rootProject.libs.log4j.template.json)
-    implementation(rootProject.libs.stellar.wallet.sdk)
 
     // Although the following libraries are transitive dependencies, we are including them here to
     // override the version
@@ -131,7 +135,7 @@ subprojects {
 
 allprojects {
   group = "org.stellar.anchor-sdk"
-  version = "2.0.0-rc.1"
+  version = "2.1.1"
 
   tasks.jar {
     manifest {

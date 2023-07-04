@@ -6,9 +6,7 @@ import static org.stellar.anchor.util.Log.infoF;
 import com.google.gson.Gson;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import lombok.NoArgsConstructor;
 import org.stellar.anchor.api.exception.InvalidConfigException;
 import org.stellar.anchor.api.exception.SepNotFoundException;
@@ -75,6 +73,21 @@ public class DefaultAssetService implements AssetService {
       throw new InvalidConfigException(
           "Invalid assets defined in configuration. Please check the logs for details.");
     }
+    // TODO: remove this check once we support SEP-31 and SEP-38 for native asset
+    AssetInfo nativeAsset = assetService.getAsset("native");
+    if (nativeAsset != null && (nativeAsset.getSep31Enabled() || nativeAsset.getSep38Enabled())) {
+      error("Native asset does not support SEP-31 or SEP-38. content=", assetsJson);
+      throw new InvalidConfigException(
+          "Invalid assets defined in configuration. Please check the logs for details.");
+    }
+    Set<String> existingAssetNames = new HashSet<>();
+    for (AssetInfo asset : assetService.assets.getAssets()) {
+      if (asset != null && !existingAssetNames.add(asset.getAssetName())) {
+        error("Assets already exist. Asset= ", asset.getAssetName());
+        throw new InvalidConfigException(
+            "Duplicate assets defined in configuration. Please check the logs for details.");
+      }
+    }
     return assetService;
   }
 
@@ -96,7 +109,8 @@ public class DefaultAssetService implements AssetService {
   @Override
   public AssetInfo getAsset(String code) {
     for (AssetInfo asset : assets.getAssets()) {
-      if (asset.getCode().equals(code)) {
+      // FIXME: ANCHOR-346
+      if (asset != null && asset.getCode().equals(code)) {
         return asset;
       }
     }

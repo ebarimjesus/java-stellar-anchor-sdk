@@ -20,6 +20,7 @@ import org.stellar.anchor.api.exception.AnchorException
 import org.stellar.anchor.api.exception.BadRequestException
 import org.stellar.anchor.api.exception.NotFoundException
 import org.stellar.anchor.api.platform.PatchTransactionRequest
+import org.stellar.anchor.api.platform.PatchTransactionsRequest
 import org.stellar.anchor.api.sep.SepTransactionStatus
 import org.stellar.anchor.api.sep.sep38.RateFee
 import org.stellar.anchor.api.shared.Amount
@@ -196,6 +197,13 @@ class TransactionServiceTest {
       )
     val mockAsset = Amount("10", fiatUSD)
     assertDoesNotThrow { transactionService.validateAsset("amount_in", mockAsset) }
+
+    val mockAssetWrongAmount = Amount("10.001", fiatUSD)
+    val ex =
+      assertThrows<AnchorException> {
+        transactionService.validateAsset("amount_in", mockAssetWrongAmount)
+      }
+    assertInstanceOf(BadRequestException::class.java, ex)
   }
 
   @ParameterizedTest
@@ -411,7 +419,6 @@ class TransactionServiceTest {
   "amount_out_asset": "stellar:USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
   "amount_fee": "2.0000",
   "amount_fee_asset": "iso4217:USD",
-  "kyc_verified": true,
   "started_at": "2022-12-19T02:06:44.500182800Z",
   "completed_at": "2022-12-19T02:09:44.500182800Z",
   "stellar_transaction_id": "2b862ac297c93e2db43fc58d407cc477396212bce5e6d5f61789f963d5a11300",
@@ -639,7 +646,6 @@ class TransactionServiceTest {
           "amount": "2.0000",
           "asset": "iso4217:USD"
         },
-        "kyc_verified": true,
         "started_at": "2022-12-19T02:06:44.500182800Z",
         "completed_at": "2022-12-19T02:09:44.500182800Z",
         "refunds": {
@@ -703,4 +709,27 @@ class TransactionServiceTest {
       }   
   """
       .trimIndent()
+
+  @Test
+  fun `patch transaction with bad body`() {
+    var patchTransactionsRequest = PatchTransactionsRequest.builder().records(null).build()
+
+    var ex =
+      assertThrows<BadRequestException> {
+        transactionService.patchTransactions(patchTransactionsRequest)
+      }
+    assertInstanceOf(BadRequestException::class.java, ex)
+    assertEquals("Records are missing.", ex.message)
+
+    val patchTransactionRequest = PatchTransactionRequest.builder().transaction(null).build()
+    val records: List<PatchTransactionRequest> = listOf(patchTransactionRequest)
+    patchTransactionsRequest = PatchTransactionsRequest.builder().records(records).build()
+
+    ex =
+      assertThrows<BadRequestException> {
+        transactionService.patchTransactions(patchTransactionsRequest)
+      }
+    assertInstanceOf(BadRequestException::class.java, ex)
+    assertEquals("Transaction is missing.", ex.message)
+  }
 }

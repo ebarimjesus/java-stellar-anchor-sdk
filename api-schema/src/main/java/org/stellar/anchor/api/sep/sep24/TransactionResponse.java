@@ -4,6 +4,7 @@ import com.google.gson.annotations.SerializedName;
 import java.time.Instant;
 import lombok.Data;
 
+/** Base class of transaction responses for withdraw and deposit. */
 @Data
 public class TransactionResponse {
   String id;
@@ -16,7 +17,7 @@ public class TransactionResponse {
   Integer status_eta;
 
   @SerializedName("more_info_url")
-  String moreInfoUrl = "http://www.stellar.org";
+  String moreInfoUrl;
 
   @SerializedName("amount_in")
   String amountIn;

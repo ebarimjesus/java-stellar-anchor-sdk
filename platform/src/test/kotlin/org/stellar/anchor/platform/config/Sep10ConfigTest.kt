@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.NullSource
 import org.junit.jupiter.params.provider.ValueSource
@@ -27,6 +28,7 @@ class Sep10ConfigTest {
 
     config = PropertySep10Config(appConfig, secretConfig)
     config.enabled = true
+    config.homeDomain = "stellar.org"
     errors = BindException(config, "config")
     every { secretConfig.sep10SigningSeed } returns
       "SDNMFWJGLVR4O2XV3SNEJVF53MMLQWYFYFC7HT7JZ5235AXPETHB4K3D"
@@ -119,9 +121,10 @@ class Sep10ConfigTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = ["stellar.org", "moneygram.com"])
+  @ValueSource(strings = ["stellar.org", "moneygram.com", "localhost", "127.0.0.1:80"])
   fun `test valid home domains`(value: String) {
     config.webAuthDomain = value
+    config.homeDomain = value
     config.validateConfig(errors)
     assertFalse(errors.hasErrors())
   }
@@ -136,26 +139,54 @@ class Sep10ConfigTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = ["stellar .org", "abc", "299.0.0.1"])
-  fun `test invalid web auth domains`(value: String) {
+  @CsvSource(
+    value =
+      [
+        "this-is-longer-than-64-bytes-which-is-the-maximum-length-for-a-web-auth-domain.stellar.org,sep10-web-auth-domain-too-long",
+        "stellar .org,sep10-web-auth-domain-invalid",
+        "abc,sep10-web-auth-domain-invalid",
+        "299.0.0.1,sep10-web-auth-domain-invalid",
+      ]
+  )
+  fun `test invalid web auth domains`(value: String, expectedErrorCode: String) {
     config.webAuthDomain = value
     config.validateConfig(errors)
     assertTrue(errors.hasErrors())
-    assertErrorCode(errors, "sep10-web-auth-domain-invalid")
+    assertErrorCode(errors, expectedErrorCode)
+  }
+
+  @ParameterizedTest
+  @CsvSource(
+    value =
+      [
+        "this-is-longer-than-64-bytes-which-is-the-maximum-length-for-a-home-domain.stellar.org,sep10-home-domain-too-long",
+        "stellar .org,sep10-home-domain-invalid",
+        "abc,sep10-home-domain-invalid",
+        "299.0.0.1,sep10-home-domain-invalid",
+        "http://stellar.org,sep10-home-domain-invalid",
+        "https://stellar.org,sep10-home-domain-invalid",
+        "://stellar.org,sep10-home-domain-invalid",
+      ]
+  )
+  fun `test invalid home domains`(value: String, expectedErrorCode: String) {
+    config.homeDomain = value
+    config.validateConfig(errors)
+    assertTrue(errors.hasErrors())
+    assertErrorCode(errors, expectedErrorCode)
   }
 
   @Test
   fun `test if web_auth_domain is not set, default to the domain of the host_url`() {
     config.webAuthDomain = null
-    every { appConfig.hostUrl } returns "https://www.stellar.org"
+    config.homeDomain = "www.stellar.org"
     config.postConstruct()
     assertEquals("www.stellar.org", config.webAuthDomain)
   }
 
   @Test
-  fun `test if web_auth_domain is  set, it is not default to the domain of the host_url`() {
+  fun `test if web_auth_domain is set, it is not default to the domain of the host_url`() {
     config.webAuthDomain = "localhost:8080"
-    every { appConfig.hostUrl } returns "https://www.stellar.org"
+    config.homeDomain = "www.stellar.org"
     config.postConstruct()
     assertEquals("localhost:8080", config.webAuthDomain)
   }

@@ -3,14 +3,14 @@
 package org.stellar.anchor.platform
 
 import com.palantir.docker.compose.DockerComposeExtension
+import com.palantir.docker.compose.configuration.ProjectName
 import com.palantir.docker.compose.connection.waiting.HealthChecks
 import java.io.File
+import java.lang.Thread.sleep
 import java.lang.reflect.Field
 import java.util.*
 import kotlinx.coroutines.*
-import org.springframework.boot.SpringApplication
 import org.springframework.context.ConfigurableApplicationContext
-import org.stellar.anchor.util.Log
 import org.stellar.anchor.util.Log.info
 
 lateinit var testProfileExecutor: TestProfileExecutor
@@ -39,28 +39,32 @@ class TestProfileExecutor(val config: TestConfig) {
   private var shouldStartDockerCompose: Boolean = false
   private var shouldStartAllServers: Boolean = false
   private var shouldStartSepServer: Boolean = false
+  private var shouldStartPlatformServer: Boolean = false
   private var shouldStartReferenceServer: Boolean = false
   private var shouldStartObserver: Boolean = false
   private var shouldStartKotlinReferenceServer: Boolean = false
 
   fun start(wait: Boolean = false, preStart: (config: TestConfig) -> Unit = {}) {
-    Log.info("Starting TestProfileExecutor...")
+    info("Starting TestProfileExecutor...")
 
     preStart(this.config)
 
     shouldStartDockerCompose = config.env["run_docker"].toBoolean()
     shouldStartAllServers = config.env["run_all_servers"].toBoolean()
     shouldStartSepServer = config.env["run_sep_server"].toBoolean()
+    shouldStartPlatformServer = config.env["run_platform_server"].toBoolean()
     shouldStartReferenceServer = config.env["run_reference_server"].toBoolean()
     shouldStartObserver = config.env["run_observer"].toBoolean()
     shouldStartKotlinReferenceServer = config.env["run_kotlin_reference_server"].toBoolean()
 
     startDocker()
+    // TODO: Check server readiness instead of wait for 5 seconds
+    sleep(5000)
     startServers(wait)
   }
 
   fun shutdown() {
-    if (shouldStartAllServers) shutdownServers()
+    shutdownServers()
     if (shouldStartDockerCompose) shutdownDocker()
   }
 
@@ -81,7 +85,8 @@ class TestProfileExecutor(val config: TestConfig) {
       }
       if (shouldStartAllServers || shouldStartReferenceServer) {
         info("Starting Java reference server...")
-        jobs += scope.launch { runningServers.add(ServiceRunner.startAnchorReferenceServer()) }
+        jobs +=
+          scope.launch { runningServers.add(ServiceRunner.startAnchorReferenceServer(envMap)) }
       }
       if (shouldStartAllServers || shouldStartObserver) {
         info("Starting observer...")
@@ -91,14 +96,19 @@ class TestProfileExecutor(val config: TestConfig) {
         info("Starting SEP server...")
         jobs += scope.launch { runningServers.add(ServiceRunner.startSepServer(envMap)) }
       }
+      if (shouldStartAllServers || shouldStartPlatformServer) {
+        info("Starting platform server...")
+        jobs += scope.launch { runningServers.add(ServiceRunner.startPlatformServer(envMap)) }
+      }
 
       if (jobs.size > 0) {
         jobs.forEach { it.join() }
-        if (wait) {
-          while (true) {
-            delay(60000)
-          }
-        }
+
+        if (wait)
+          do {
+            val anyActive = runningServers.any { it.isActive || it.isRunning }
+            delay(5000)
+          } while (anyActive)
       }
     }
 
@@ -106,8 +116,8 @@ class TestProfileExecutor(val config: TestConfig) {
   }
 
   private fun startDocker() {
-    info("Starting docker compose...")
     if (shouldStartDockerCompose) {
+      info("Starting docker compose...")
       if (isWindows()) {
         setupWindowsEnv()
       }
@@ -118,10 +128,13 @@ class TestProfileExecutor(val config: TestConfig) {
       docker =
         DockerComposeExtension.builder()
           .saveLogsTo("${userHomeFolder}/docker-logs/anchor-platform-integration-test")
-          .file("${dockerComposeFile.absolutePath}")
+          .file(dockerComposeFile.absolutePath)
           .waitingForService("kafka", HealthChecks.toHaveAllPortsOpen())
           .waitingForService("db", HealthChecks.toHaveAllPortsOpen())
           .pullOnStartup(true)
+          .projectName(
+            ProjectName.fromString("anchorplatform${UUID.randomUUID().toString().takeLast(6)}")
+          )
           .build()
 
       docker.beforeAll(null)
@@ -129,7 +142,10 @@ class TestProfileExecutor(val config: TestConfig) {
   }
 
   private fun shutdownServers() {
-    runningServers.forEach { SpringApplication.exit(it) }
+    runningServers.forEach {
+      it.close()
+      it.stop()
+    }
     org.stellar.reference.stop()
   }
 
@@ -138,7 +154,7 @@ class TestProfileExecutor(val config: TestConfig) {
   }
 
   private fun isWindows(): Boolean {
-    return System.getProperty("os.name").toLowerCase().contains("win")
+    return System.getProperty("os.name").lowercase(Locale.getDefault()).contains("win")
   }
 
   private fun setupWindowsEnv() {
@@ -154,7 +170,7 @@ class TestProfileExecutor(val config: TestConfig) {
     )
   }
 
-  @SuppressWarnings("unchecked")
+  @Suppress("UNCHECKED_CAST")
   private fun setEnv(envs: Map<String, String>?) {
     try {
       val processEnvironmentClass = Class.forName("java.lang.ProcessEnvironment")

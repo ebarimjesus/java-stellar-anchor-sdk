@@ -3,6 +3,7 @@ package org.stellar.anchor.platform.utils;
 import static org.stellar.anchor.api.platform.PlatformTransactionData.Kind.*;
 
 import javax.annotation.Nullable;
+import lombok.SneakyThrows;
 import org.stellar.anchor.api.exception.SepException;
 import org.stellar.anchor.api.platform.GetTransactionResponse;
 import org.stellar.anchor.api.platform.PlatformTransactionData;
@@ -18,8 +19,9 @@ import org.stellar.anchor.sep24.Sep24Refunds;
 import org.stellar.anchor.sep31.Sep31Refunds;
 
 public class TransactionHelper {
+  @SneakyThrows
   public static GetTransactionResponse toGetTransactionResponse(
-      JdbcSepTransaction txn, AssetService assetService) throws SepException {
+      JdbcSepTransaction txn, AssetService assetService) {
     switch (txn.getProtocol()) {
       case "24":
         return toGetTransactionResponse((JdbcSep24Transaction) txn, assetService);
@@ -81,10 +83,10 @@ public class TransactionHelper {
         .amountIn(Amount.create(txn.getAmountIn(), amountInAsset))
         .amountOut(Amount.create(txn.getAmountOut(), amountOutAsset))
         .amountFee(Amount.create(txn.getAmountFee(), amountFeeAsset))
-        .kycVerified(txn.getKycVerified())
         .startedAt(txn.getStartedAt())
         .updatedAt(txn.getUpdatedAt())
         .completedAt(txn.getCompletedAt())
+        .transferReceivedAt(txn.getTransferReceivedAt())
         .message(txn.getMessage())
         .refunds(refunds)
         .stellarTransactions(txn.getStellarTransactions())

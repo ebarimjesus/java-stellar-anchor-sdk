@@ -45,7 +45,7 @@ public class Sep24Service {
 
   static final Gson gson = GsonUtils.getInstance();
 
-  public static final List<String> INTERACTIVE_URL_JWT_REQUIRED_FIELDS =
+  public static final List<String> INTERACTIVE_URL_JWT_REQUIRED_FIELDS_FROM_REQUEST =
       List.of("amount", "client_domain", "lang");
 
   public Sep24Service(
@@ -110,12 +110,23 @@ public class Sep24Service {
       throw new SepValidationException(String.format("invalid operation for asset %s", assetCode));
     }
 
-    // Validate amount
-    if (strAmount != null) {
-      if (decimal(strAmount).compareTo(decimal(asset.getWithdraw().getMinAmount())) < 0
-          || decimal(strAmount).compareTo(decimal(asset.getWithdraw().getMaxAmount())) > 0) {
+    // Validate min amount
+    Long minAmount = asset.getWithdraw().getMinAmount();
+    if (strAmount != null && minAmount != null) {
+      if (decimal(strAmount).compareTo(decimal(minAmount)) < 0) {
         infoF("invalid amount {}", strAmount);
-        throw new SepValidationException(String.format("invalid amount: %s", strAmount));
+        throw new SepValidationException(
+            String.format("amount is less than asset's minimum limit: %s", strAmount));
+      }
+    }
+
+    // Validate max amount
+    Long maxAmount = asset.getWithdraw().getMaxAmount();
+    if (strAmount != null && maxAmount != null) {
+      if (decimal(strAmount).compareTo(decimal(maxAmount)) > 0) {
+        infoF("invalid amount {}", strAmount);
+        throw new SepValidationException(
+            String.format("amount exceeds asset's maximum limit: %s", strAmount));
       }
     }
 
@@ -237,12 +248,23 @@ public class Sep24Service {
       throw new SepValidationException(String.format("invalid operation for asset %s", assetCode));
     }
 
-    // Validate amount
-    if (strAmount != null) {
-      if (decimal(strAmount).compareTo(decimal(asset.getDeposit().getMinAmount())) < 0
-          || decimal(strAmount).compareTo(decimal(asset.getDeposit().getMaxAmount())) > 0) {
+    // Validate min amount
+    Long minAmount = asset.getWithdraw().getMinAmount();
+    if (strAmount != null && minAmount != null) {
+      if (decimal(strAmount).compareTo(decimal(minAmount)) < 0) {
         infoF("invalid amount {}", strAmount);
-        throw new SepValidationException(String.format("invalid amount: %s", strAmount));
+        throw new SepValidationException(
+            String.format("amount is less than asset's minimum limit: %s", strAmount));
+      }
+    }
+
+    // Validate max amount
+    Long maxAmount = asset.getWithdraw().getMaxAmount();
+    if (strAmount != null && maxAmount != null) {
+      if (decimal(strAmount).compareTo(decimal(maxAmount)) > 0) {
+        infoF("invalid amount {}", strAmount);
+        throw new SepValidationException(
+            String.format("amount exceeds asset's maximum limit: %s", strAmount));
       }
     }
 
@@ -304,8 +326,21 @@ public class Sep24Service {
       throw new SepNotAuthorizedException("missing token");
     }
 
+    String assetCode = txReq.getAssetCode();
+    String assetIssuer = null;
+
+    if (assetCode.contains("stellar:")) {
+      String[] parsed = txReq.getAssetCode().split(":");
+      if (parsed.length == 3) {
+        assetCode = parsed[1];
+        assetIssuer = parsed[2];
+      } else if (parsed.length == 2) {
+        assetCode = parsed[1];
+      }
+    }
+
     infoF("findTransactions. account={}", shorter(token.getAccount()));
-    if (assetService.getAsset(txReq.getAssetCode()) == null) {
+    if (assetService.getAsset(assetCode, assetIssuer) == null) {
       infoF(
           "asset code:{} not supported",
           (txReq.getAssetCode() == null) ? "null" : txReq.getAssetCode());
@@ -430,9 +465,7 @@ public class Sep24Service {
     txnR.setDepositMemo(txn.getMemo());
     txnR.setDepositMemoType(txn.getMemoType());
 
-    if (needsMoreInfoUrlDeposit.contains(txn.getStatus())) {
-      txnR.setMoreInfoUrl(moreInfoUrlConstructor.construct(txn));
-    }
+    txnR.setMoreInfoUrl(moreInfoUrlConstructor.construct(txn));
 
     return txnR;
   }
@@ -449,9 +482,7 @@ public class Sep24Service {
     txnR.setWithdrawMemoType(txn.getMemoType());
     txnR.setWithdrawAnchorAccount(txn.getWithdrawAnchorAccount());
 
-    if (needsMoreInfoUrlWithdraw.contains(txn.getStatus())) {
-      txnR.setMoreInfoUrl(moreInfoUrlConstructor.construct(txn));
-    }
+    txnR.setMoreInfoUrl(moreInfoUrlConstructor.construct(txn));
 
     return txnR;
   }

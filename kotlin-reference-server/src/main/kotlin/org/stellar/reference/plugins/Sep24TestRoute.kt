@@ -4,6 +4,7 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.util.logging.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -40,7 +41,7 @@ fun Route.testSep24(
       }
 
       val transaction = sep24.getTransaction(transactionId)
-      var amountExpected = transaction.amountExpected?.amount?.toBigDecimal()
+      var amountExpected = token.data["amount"]?.toBigDecimal()
       if (amountExpected == null) {
         log.info(
           "Missing amountExpected.amount field. Using default value: 10 to simulate the amount was entered by the user in the interactive flow."
@@ -54,8 +55,7 @@ fun Route.testSep24(
               transaction.destinationAccount
                 ?: throw ClientException("Missing destination_account field")
             val asset =
-              transaction.amountExpected!!.asset
-                ?: throw ClientException("Missing amountExpected.asset field")
+              token.data["asset"] ?: throw ClientException("Missing amountExpected.asset field")
             val memo = transaction.memo
             val memoType = transaction.memoType
 
@@ -82,9 +82,14 @@ fun Route.testSep24(
           "withdrawal" -> {
             call.respondText("The sep24 interactive withdrawal has been successfully started.")
 
+            val asset =
+              token.data["asset"] ?: throw ClientException("Missing amountExpected.asset field")
+
+            val stellarAsset = asset.replace("stellar:", "")
+
             // Run deposit processing asynchronously
             CoroutineScope(Job()).launch {
-              withdrawalService.processWithdrawal(transactionId, amountExpected)
+              withdrawalService.processWithdrawal(transactionId, amountExpected, stellarAsset)
             }
           }
           else ->
@@ -94,8 +99,10 @@ fun Route.testSep24(
             )
         }
       } catch (e: ClientException) {
+        log.error(e)
         call.respondText(e.message!!, status = HttpStatusCode.BadRequest)
       } catch (e: Exception) {
+        log.error(e)
         call.respondText(
           "Error occurred: ${e.message}",
           status = HttpStatusCode.InternalServerError

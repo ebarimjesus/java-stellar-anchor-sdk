@@ -11,6 +11,14 @@ import lombok.experimental.SuperBuilder;
 import org.stellar.anchor.api.sep.SepTransactionStatus;
 import org.stellar.anchor.api.shared.*;
 
+/**
+ * The transaction data in the response body of the GET /transactions/{id} endpoint of the Platform
+ * API.
+ *
+ * @see <a
+ *     href="https://github.com/stellar/stellar-docs/blob/main/openapi/ap/Platform%20API.yml">Platform
+ *     API</a>
+ */
 @Getter
 @Setter
 @SuperBuilder
@@ -32,9 +40,6 @@ public class PlatformTransactionData {
 
   @SerializedName("amount_fee")
   Amount amountFee;
-
-  @SerializedName("kyc_verified")
-  Boolean kycVerified;
 
   @SerializedName("quote_id")
   String quoteId;
@@ -65,10 +70,6 @@ public class PlatformTransactionData {
 
   @SerializedName("external_transaction_id")
   String externalTransactionId;
-
-  // TODO: review the use case of the custodialTransactionId
-  @SerializedName("custodial_transaction_id")
-  String custodialTransactionId;
 
   @SerializedName("memo")
   String memo;
