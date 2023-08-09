@@ -122,7 +122,8 @@ payment_observer:
   context_path: /
   # The listening port of the Stellar observer server
   port: 8083
-  # The management server port
+  # The management_server_port is the port used by Spring actuator.
+  # https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html
   management_server_port: 9083
   #
   # The type of the observer.
@@ -158,7 +159,8 @@ event_processor:
   context_path: /
   # The listening port of the event processing server
   port: 8088
-  # The management server port
+  # The management_server_port is the port used by Spring actuator.
+  # https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html
   management_server_port: 9088
   # The configuration of the status callback to the client domain
   client_status_callback:
@@ -174,7 +176,8 @@ event_processor:
 ##############################
 # The list of clients for the Anchor server to safely communicate with the outside wallet servers or clients.
 # Each item in the list may contain the following fields:
-#   - type: `custodial` or `noncustodial`
+#   - name: (required) the name of the client
+#   - type: (required) `custodial` or `noncustodial`
 #
 #   If the type is `custodial`,
 #   - signing_key: (required) the custodial SEP-10 signing key of the client. If the signing key of the client
@@ -190,21 +193,26 @@ event_processor:
 #                 If they don't match, a validation error will be thrown.
 #
 # Examples:
-#     - type: custodial
+#     - name: circle
+#       type: custodial
 #       signing_key: GBI2IWJGR4UQPBIKPP6WG76X5PHSD2QTEBGIP6AZ3ZXWV46ZUSGNEGN2
 #       callback_url: https://callback.circle.com/api/v1/anchor/callback
-#     - type: noncustodial
+#     - name: lobstr
+#       type: noncustodial
 #       domain: lobstr.co
 #       callback_url: https://callback.lobstr.co/api/v2/anchor/callback
-#     - type: noncustodial
+#     - name: vibrant
+#       type: noncustodial
 #       domain: vibrant.co
 #       callback_url: https://callback.vibrant.com/api/v2/anchor/callback
 #       signing_key: GA22WORKYRXB6AW7XR5GIOAOQUY4KKCENEAI34FN3KJNWHKDZTZSVLTU
 clients:
-#     - type: custodial
+#     - name:
+#       type: custodial
 #       signing_key:
 #       callback_url:
-#     - type: noncustodial
+#     - name:
+#       type: noncustodial
 #       domain:
 #       callback_url:
 #       signing_key:
@@ -217,7 +225,8 @@ platform_server:
   context_path: /
   # The listening port of the Platform server
   port: 8085
-  # The management server port
+  # The management_server_port is the port used by Spring actuator.
+  # https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html
   management_server_port: 9085
   # Defines the authentication requirements of the platform_api requests. This is used to ensure that the requests
   # must satisfy the authentication requirements before they can be processed.
@@ -254,7 +263,8 @@ sep_server:
   context_path: /
   # The listening port of the SEP server
   port: 8080
-  # the management server port
+  # The management_server_port is the port used by Spring actuator.
+  # https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html
   management_server_port: 9080
 
 ######################
@@ -313,6 +323,12 @@ sep10:
   # If the client_attribution_required is set to true, the list of allowed clients must be configured in the `clients`
   # section of this configuration file. The `domain` field of the client must be provided.
   client_attribution_required: false
+  # The list of allowed clients for the SEP-10 authentication.
+  # Each item in the list must match the names of one of the client defined in the `clients` section.
+  # If the list is empty, all clients defined in the `clients` section are allowed.
+  # Ex: client_allow_list: [circle, lobstr]
+  # Ex: client_allow_list: circle,lobstr
+  client_allow_list:
   # Set the authentication challenge transaction timeout in seconds. An expired signed transaction will be rejected.
   # This is the timeout period the client must finish the authentication process. (ie: sign and respond the challenge
   # transaction).
@@ -422,19 +438,13 @@ sep38:
 
 
 ##########################
-# Metrics Configuration
+# Metric Configuration
 ##########################
 # The metrics are exposed at the port specified by each server's (eg: sep, platform, event processor and observer)
 # management_server_port
 metrics:
   # If true, enable metrics will be enabled.
   enabled: false
-  # The configuration of making extended metrics available.
-  extended_metrics:
-    # If true, the extended metrics will be enabled.
-    enabled: false
-    # Interval in seconds to query the database to generate metrics
-    run_interval: 30
 
 
 #########################
